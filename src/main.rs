@@ -6,5 +6,7 @@ fn main() {
     std::io::stdin().read_line(&mut input).unwrap();
 
     let tokens = tokenizer::tokenizer(input.trim()).unwrap();
-    let _ast = parser::parser(tokens);
+    let ast = parser::parser(tokens).unwrap();
+
+    println!("{:?}", ast);
 }

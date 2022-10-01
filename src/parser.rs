@@ -1,14 +1,15 @@
 use crate::tokenizer::Token;
 
 #[derive(Debug, PartialEq, Eq)]
-enum Node {
+pub enum AstNodeKind {
+    Program(Vec<AstNode>),
     NumberLiteral(String),
     StringLiteral(String),
-    CallExpression { name: String, params: Vec<Node> },
+    CallExpression { name: String, params: Vec<AstNode> },
 }
 #[derive(Debug, PartialEq, Eq)]
-pub struct Ast {
-    body: Vec<Node>,
+pub struct AstNode {
+    kind: AstNodeKind,
 }
 
 struct Counter {
@@ -23,20 +24,24 @@ impl Counter {
     }
 }
 
-fn walk(tokens: &Vec<Token>, counter: &mut Counter) -> Node {
+fn walk(tokens: &Vec<Token>, counter: &mut Counter) -> AstNode {
     match &tokens[counter.count] {
         Token::Number(value) => {
             counter.increment();
-            Node::NumberLiteral(value.to_string())
+            AstNode {
+                kind: AstNodeKind::NumberLiteral(value.to_owned()),
+            }
         }
         Token::String(value) => {
             counter.increment();
-            Node::StringLiteral(value.to_string())
+            AstNode {
+                kind: AstNodeKind::StringLiteral(value.to_owned()),
+            }
         }
         Token::ParenOpen => {
             counter.increment();
             if let Token::Name(value) = &tokens[counter.count] {
-                let mut params: Vec<Node> = vec![];
+                let mut params: Vec<AstNode> = vec![];
                 counter.increment();
 
                 loop {
@@ -49,9 +54,11 @@ fn walk(tokens: &Vec<Token>, counter: &mut Counter) -> Node {
 
                 counter.increment();
 
-                return Node::CallExpression {
-                    name: value.to_string(),
-                    params,
+                return AstNode {
+                    kind: AstNodeKind::CallExpression {
+                        name: value.to_owned(),
+                        params,
+                    },
                 };
             }
             panic!();
@@ -61,15 +68,17 @@ fn walk(tokens: &Vec<Token>, counter: &mut Counter) -> Node {
     }
 }
 
-pub fn parser(tokens: Vec<Token>) -> Result<Ast, String> {
+pub fn parser(tokens: Vec<Token>) -> Result<AstNode, String> {
     let mut counter = Counter::new();
-    let mut body: Vec<Node> = vec![];
+    let mut body: Vec<AstNode> = vec![];
 
     while counter.count < tokens.len() {
         body.push(walk(&tokens, &mut counter));
     }
 
-    Ok(Ast { body })
+    Ok(AstNode {
+        kind: AstNodeKind::Program(body),
+    })
 }
 
 #[cfg(test)]
@@ -89,20 +98,30 @@ mod parser_test {
             Token::ParenClose,
             Token::ParenClose,
         ];
-        let excepted = Ast {
-            body: vec![Node::CallExpression {
-                name: "add".to_string(),
-                params: vec![
-                    Node::NumberLiteral("2".to_string()),
-                    Node::CallExpression {
-                        name: "subtract".to_string(),
-                        params: vec![
-                            Node::NumberLiteral("4".to_string()),
-                            Node::NumberLiteral("2".to_string()),
-                        ],
-                    },
-                ],
-            }],
+        let excepted = AstNode {
+            kind: AstNodeKind::Program(vec![AstNode {
+                kind: AstNodeKind::CallExpression {
+                    name: "add".to_string(),
+                    params: vec![
+                        AstNode {
+                            kind: AstNodeKind::NumberLiteral("2".to_string()),
+                        },
+                        AstNode {
+                            kind: AstNodeKind::CallExpression {
+                                name: "subtract".to_string(),
+                                params: vec![
+                                    AstNode {
+                                        kind: AstNodeKind::NumberLiteral("4".to_string()),
+                                    },
+                                    AstNode {
+                                        kind: AstNodeKind::NumberLiteral("2".to_string()),
+                                    },
+                                ],
+                            },
+                        },
+                    ],
+                },
+            }]),
         };
 
         assert_eq!(parser(input).unwrap(), excepted);
