@@ -1,5 +1,7 @@
 use crate::tokenizer::Token;
 use crate::transformer::NewAstNode;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum AstNodeKind {
@@ -10,7 +12,7 @@ pub enum AstNodeKind {
 }
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AstNode {
-    pub context: Vec<NewAstNode>,
+    pub context: Rc<RefCell<Vec<NewAstNode>>>,
     pub kind: AstNodeKind,
 }
 
@@ -31,14 +33,14 @@ fn walk(tokens: &Vec<Token>, counter: &mut Counter) -> AstNode {
         Token::Number(value) => {
             counter.increment();
             AstNode {
-                context: vec![],
+                context: Rc::new(RefCell::new(vec![])),
                 kind: AstNodeKind::NumberLiteral(value.to_owned()),
             }
         }
         Token::String(value) => {
             counter.increment();
             AstNode {
-                context: vec![],
+                context: Rc::new(RefCell::new(vec![])),
                 kind: AstNodeKind::StringLiteral(value.to_owned()),
             }
         }
@@ -59,7 +61,7 @@ fn walk(tokens: &Vec<Token>, counter: &mut Counter) -> AstNode {
                 counter.increment();
 
                 return AstNode {
-                    context: vec![],
+                    context: Rc::new(RefCell::new(vec![])),
                     kind: AstNodeKind::CallExpression {
                         name: value.to_owned(),
                         params,
@@ -82,7 +84,7 @@ pub fn parser(tokens: Vec<Token>) -> Result<AstNode, String> {
     }
 
     Ok(AstNode {
-        context: vec![],
+        context: Rc::new(RefCell::new(vec![])),
         kind: AstNodeKind::Program(body),
     })
 }
@@ -105,27 +107,27 @@ mod parser_test {
             Token::ParenClose,
         ];
         let excepted = AstNode {
-            context: vec![],
+            context: Rc::new(RefCell::new(vec![])),
             kind: AstNodeKind::Program(vec![AstNode {
-                context: vec![],
+                context: Rc::new(RefCell::new(vec![])),
                 kind: AstNodeKind::CallExpression {
                     name: "add".to_string(),
                     params: vec![
                         AstNode {
-                            context: vec![],
+                            context: Rc::new(RefCell::new(vec![])),
                             kind: AstNodeKind::NumberLiteral("2".to_string()),
                         },
                         AstNode {
-                            context: vec![],
+                            context: Rc::new(RefCell::new(vec![])),
                             kind: AstNodeKind::CallExpression {
                                 name: "subtract".to_string(),
                                 params: vec![
                                     AstNode {
-                                        context: vec![],
+                                        context: Rc::new(RefCell::new(vec![])),
                                         kind: AstNodeKind::NumberLiteral("4".to_string()),
                                     },
                                     AstNode {
-                                        context: vec![],
+                                        context: Rc::new(RefCell::new(vec![])),
                                         kind: AstNodeKind::NumberLiteral("2".to_string()),
                                     },
                                 ],
