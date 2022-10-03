@@ -3,22 +3,16 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum NewAstNodeKind {
+pub enum NewAstNode {
     Program(Rc<RefCell<Vec<NewAstNode>>>),
+    Identifier(String),
     NumberLiteral(String),
     StringLiteral(String),
     CallExpression {
-        callee_name: String,
+        callee: Box<NewAstNode>,
         arguments: Rc<RefCell<Vec<NewAstNode>>>,
     },
-    ExpressionStatement {
-        callee_name: String,
-        arguments: Rc<RefCell<Vec<NewAstNode>>>,
-    },
-}
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct NewAstNode {
-    pub kind: NewAstNodeKind,
+    ExpressionStatement(Box<NewAstNode>),
 }
 
 fn traverser(ast: &mut AstNode, _visitor: ()) {
@@ -51,26 +45,23 @@ fn enter(node: &AstNode, parent: &Option<&mut AstNode>) {
     {
         match &node.kind {
             AstNodeKind::NumberLiteral(value) => {
-                let kind = NewAstNodeKind::NumberLiteral(value.to_owned());
-                parent_context.borrow_mut().push(NewAstNode { kind });
+                let new_ast_node = NewAstNode::NumberLiteral(value.to_owned());
+                parent_context.borrow_mut().push(new_ast_node);
             }
             AstNodeKind::StringLiteral(value) => {
-                let kind = NewAstNodeKind::StringLiteral(value.to_owned());
-                parent_context.borrow_mut().push(NewAstNode { kind });
+                let new_ast_node = NewAstNode::StringLiteral(value.to_owned());
+                parent_context.borrow_mut().push(new_ast_node);
             }
             AstNodeKind::CallExpression { name, params: _ } => {
+                let new_ast_node = NewAstNode::CallExpression {
+                    callee: Box::new(NewAstNode::Identifier(name.to_owned())),
+                    arguments: Rc::clone(&node.context),
+                };
                 if let AstNodeKind::CallExpression { name: _, params: _ } = parent_kind {
-                    let kind = NewAstNodeKind::CallExpression {
-                        callee_name: name.to_owned(),
-                        arguments: Rc::clone(&node.context),
-                    };
-                    parent_context.borrow_mut().push(NewAstNode { kind });
+                    parent_context.borrow_mut().push(new_ast_node);
                 } else {
-                    let kind = NewAstNodeKind::ExpressionStatement {
-                        callee_name: name.to_owned(),
-                        arguments: Rc::clone(&node.context),
-                    };
-                    parent_context.borrow_mut().push(NewAstNode { kind });
+                    let new_ast_node = NewAstNode::ExpressionStatement(Box::new(new_ast_node));
+                    parent_context.borrow_mut().push(new_ast_node);
                 }
             }
             _ => (),
@@ -83,9 +74,7 @@ fn exit(_node: &AstNode, _parent: &Option<&mut AstNode>) {}
 pub fn transformer(mut ast: AstNode) -> Result<NewAstNode, String> {
     traverser(&mut ast, ());
 
-    Ok(NewAstNode {
-        kind: NewAstNodeKind::Program(ast.context.to_owned()),
-    })
+    Ok(NewAstNode::Program(ast.context.to_owned()))
 }
 
 #[cfg(test)]
@@ -126,31 +115,21 @@ mod transformer_test {
             }]),
         };
 
-        let excepted = NewAstNode {
-            kind: NewAstNodeKind::Program(Rc::new(RefCell::new(vec![NewAstNode {
-                kind: NewAstNodeKind::ExpressionStatement {
-                    callee_name: "add".to_string(),
-                    arguments: Rc::new(RefCell::new(vec![
-                        NewAstNode {
-                            kind: NewAstNodeKind::NumberLiteral("2".to_string()),
-                        },
-                        NewAstNode {
-                            kind: NewAstNodeKind::CallExpression {
-                                callee_name: "subtract".to_string(),
-                                arguments: Rc::new(RefCell::new(vec![
-                                    NewAstNode {
-                                        kind: NewAstNodeKind::NumberLiteral("4".to_string()),
-                                    },
-                                    NewAstNode {
-                                        kind: NewAstNodeKind::NumberLiteral("2".to_string()),
-                                    },
-                                ])),
-                            },
-                        },
-                    ])),
-                },
-            }]))),
-        };
+        let excepted = NewAstNode::Program(Rc::new(RefCell::new(vec![
+            NewAstNode::ExpressionStatement(Box::new(NewAstNode::CallExpression {
+                callee: Box::new(NewAstNode::Identifier("add".to_string())),
+                arguments: Rc::new(RefCell::new(vec![
+                    NewAstNode::NumberLiteral("2".to_string()),
+                    NewAstNode::CallExpression {
+                        callee: Box::new(NewAstNode::Identifier("subtract".to_string())),
+                        arguments: Rc::new(RefCell::new(vec![
+                            NewAstNode::NumberLiteral("4".to_string()),
+                            NewAstNode::NumberLiteral("2".to_string()),
+                        ])),
+                    },
+                ])),
+            })),
+        ])));
 
         assert_eq!(transformer(input).unwrap(), excepted);
     }
