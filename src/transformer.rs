@@ -27,7 +27,7 @@ fn traverser(ast: &mut AstNode, _visitor: ()) {
 
         match &mut node.kind.clone() {
             AstNodeKind::Program(body) => traverse_array(body, node),
-            AstNodeKind::CallExpression { name: _, params } => traverse_array(params, node),
+            AstNodeKind::CallExpression { params, .. } => traverse_array(params, node),
             _ => (),
         }
 
@@ -52,12 +52,12 @@ fn enter(node: &AstNode, parent: &Option<&mut AstNode>) {
                 let new_ast_node = NewAstNode::StringLiteral(value.to_owned());
                 parent_context.borrow_mut().push(new_ast_node);
             }
-            AstNodeKind::CallExpression { name, params: _ } => {
+            AstNodeKind::CallExpression { name, .. } => {
                 let new_ast_node = NewAstNode::CallExpression {
                     callee: Box::new(NewAstNode::Identifier(name.to_owned())),
                     arguments: Rc::clone(&node.context),
                 };
-                if let AstNodeKind::CallExpression { name: _, params: _ } = parent_kind {
+                if let AstNodeKind::CallExpression { .. } = parent_kind {
                     parent_context.borrow_mut().push(new_ast_node);
                 } else {
                     let new_ast_node = NewAstNode::ExpressionStatement(Box::new(new_ast_node));
